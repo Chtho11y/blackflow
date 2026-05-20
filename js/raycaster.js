@@ -8,11 +8,14 @@
    ============================================================ */
 
 const Raycaster = (() => {
-  const FOV = Math.PI / 3;             // 60° — classic
+  const DEFAULT_FOV = Math.PI / 3;     // 60° — classic
+  let fov = DEFAULT_FOV;
   const MAX_DEPTH = 6;                 // rays don't need to go far when fog kills them fast
   const FOG_START = 0.4;               // fog begins almost immediately
   const FOG_END = 2.2;                 // fully black just past 2 tiles
   const FOG_CURVE = 1.8;               // >1 = darken faster near the end
+  let useTextures = true;
+  let fogEnabled = true;
 
   /* Thin-wall thickness in world units (1 unit = 1 cell wide).
      0.10 means the wall takes up 10% of a cell, the room 90%. */
@@ -36,6 +39,9 @@ const Raycaster = (() => {
      Fog applied with a curve so the falloff is gentle up close and
      then crushes hard into pure black. */
   function tint(r, g, b, fog) {
+    if (!fogEnabled) {
+      return [r | 0, g | 0, b | 0];
+    }
     const f = Math.pow(Math.min(1, Math.max(0, fog)), FOG_CURVE);
     const nf = 1 - f;
     /* Ambient floor color the world fades into — near-black with the
@@ -99,7 +105,7 @@ const Raycaster = (() => {
     const gData = groundTex.data;
     const cosA = Math.cos(baseAngle);
     const sinA = Math.sin(baseAngle);
-    const tanHalfFov = Math.tan(FOV / 2);
+    const tanHalfFov = Math.tan(fov / 2);
 
     /* World-space ray dirs for the leftmost (col=-1) and rightmost (col=+1)
        camera columns. We linearly interpolate between them per column. */
@@ -129,32 +135,41 @@ const Raycaster = (() => {
       let floorY = ps.y + rowDist * rayDirL_y;
 
       /* Same fog curve as the walls so the join at the wall base is invisible. */
-      const fog = Math.min(1, Math.max(0,
-        (rowDist - FOG_START) / (FOG_END - FOG_START)));
-      const f = Math.pow(fog, FOG_CURVE);
-      const nf = 1 - f;
+      const fog = fogEnabled
+        ? Math.min(1, Math.max(0, (rowDist - FOG_START) / (FOG_END - FOG_START)))
+        : 0;
+      const f = fogEnabled ? Math.pow(fog, FOG_CURVE) : 0;
+      const nf = fogEnabled ? (1 - f) : 1;
 
       for (let x = 0; x < W; x++) {
-        /* Wrap to texture. The blackstream tile is 64x64 power-of-two,
-           so `& (size-1)` is the cheap modulo. TILE controls how many
-           world units one texture repeat covers — larger = bigger,
-           more visible patches of "stream" under your feet. */
-        const TILE = 2.0; // world-units per texture repeat
-        const u = floorX / TILE;
-        const v = floorY / TILE;
-        const tx = (((u - Math.floor(u)) * gW) | 0) & (gW - 1);
-        const ty = (((v - Math.floor(v)) * gH) | 0) & (gH - 1);
-        const idx = (ty * gW + tx) * 4;
-        /* Source blackstream texture is intentionally near-black, so
-           we *boost* it here — otherwise fog crushes the floor into
-           solid pitch and you can't read the ground at all. Combined
-           with the fog blend below, the floor still goes pure-black
-           past ~2 tiles, just like the walls. */
-        const FLOOR_GAIN = 1.6;
-        const FLOOR_BIAS = 6;     // lifted black point so detail survives
-        const r0 = Math.min(255, gData[idx]     * FLOOR_GAIN + FLOOR_BIAS);
-        const g0 = Math.min(255, gData[idx + 1] * FLOOR_GAIN + FLOOR_BIAS);
-        const b0 = Math.min(255, gData[idx + 2] * FLOOR_GAIN + FLOOR_BIAS);
+        let r0, g0, b0;
+        if (useTextures) {
+          /* Wrap to texture. The blackstream tile is 64x64 power-of-two,
+             so `& (size-1)` is the cheap modulo. TILE controls how many
+             world units one texture repeat covers — larger = bigger,
+             more visible patches of "stream" under your feet. */
+          const TILE = 2.0; // world-units per texture repeat
+          const u = floorX / TILE;
+          const v = floorY / TILE;
+          const tx = (((u - Math.floor(u)) * gW) | 0) & (gW - 1);
+          const ty = (((v - Math.floor(v)) * gH) | 0) & (gH - 1);
+          const idx = (ty * gW + tx) * 4;
+          /* Source blackstream texture is intentionally near-black, so
+             we *boost* it here — otherwise fog crushes the floor into
+             solid pitch and you can't read the ground at all. Combined
+             with the fog blend below, the floor still goes pure-black
+             past ~2 tiles, just like the walls. */
+          const FLOOR_GAIN = 1.6;
+          const FLOOR_BIAS = 6;     // lifted black point so detail survives
+          r0 = Math.min(255, gData[idx]     * FLOOR_GAIN + FLOOR_BIAS);
+          g0 = Math.min(255, gData[idx + 1] * FLOOR_GAIN + FLOOR_BIAS);
+          b0 = Math.min(255, gData[idx + 2] * FLOOR_GAIN + FLOOR_BIAS);
+        } else {
+          const check = ((((floorX * 1.6) | 0) + ((floorY * 1.6) | 0)) & 1) ? 1.0 : 0.86;
+          r0 = 10 * check;
+          g0 = 20 * check;
+          b0 = 13 * check;
+        }
 
         /* Fade to ambient floor (near-pitch with faint dead-green). */
         const r = (r0 * nf + 2 * f) | 0;
@@ -172,7 +187,7 @@ const Raycaster = (() => {
 
     for (let col = 0; col < W; col++) {
       const cameraX = (2 * col) / W - 1;          // -1..1
-      const rayAngle = baseAngle + Math.atan(cameraX * Math.tan(FOV / 2));
+      const rayAngle = baseAngle + Math.atan(cameraX * Math.tan(fov / 2));
       const rdx = Math.cos(rayAngle);
       const rdy = Math.sin(rayAngle);
 
@@ -259,7 +274,7 @@ const Raycaster = (() => {
         if (hitSide === 0) texU = 1 - texU;       // flip N faces
       }
 
-      const tex = Textures.byId(wallTex);
+      const tex = useTextures ? Textures.byId(wallTex) : null;
       const fog = Math.min(1, Math.max(0,
         (corrected - FOG_START) / (FOG_END - FOG_START)));
       /* Side shading — N/S walls slightly darker than E/W. */
@@ -267,9 +282,17 @@ const Raycaster = (() => {
 
       for (let y = drawStart; y <= drawEnd; y++) {
         const v = (y - (horizon - lineH / 2)) / lineH;
-        const [tr, tg, tb] = sampleTex(tex, texU, v);
+        let tr, tg, tb;
+        if (useTextures) {
+          [tr, tg, tb] = sampleTex(tex, texU, v);
+        } else {
+          const base = (wallTex % 2 === 0) ? [48, 68, 54] : [34, 52, 40];
+          tr = base[0];
+          tg = base[1];
+          tb = base[2];
+        }
         const [r, g, b] = tint(
-          tr * sideShade, tg * sideShade, tb * sideShade, fog);
+          tr * sideShade, tg * sideShade, tb * sideShade, fogEnabled ? fog : 0);
         setPixel(col, y, r, g, b);
       }
     }
@@ -288,5 +311,18 @@ const Raycaster = (() => {
     return zBuffer;
   }
 
-  return { init, render };
+  function setFovDeg(deg) {
+    const clamped = Math.max(40, Math.min(100, deg));
+    fov = (clamped * Math.PI) / 180;
+  }
+
+  function setUseTextures(enabled) {
+    useTextures = !!enabled;
+  }
+
+  function setFogEnabled(enabled) {
+    fogEnabled = !!enabled;
+  }
+
+  return { init, render, setFovDeg, setUseTextures, setFogEnabled };
 })();

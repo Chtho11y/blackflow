@@ -7,6 +7,7 @@ const Minimap = (() => {
   let canvas, ctx;
   let cellSize = 8;
   let padding = 4;
+  let visible = true;
 
   function init() {
     canvas = document.getElementById("minimap");
@@ -17,6 +18,7 @@ const Minimap = (() => {
     }
     ctx = canvas.getContext("2d");
     resize();
+    setVisible(visible);
     render();
   }
 
@@ -90,11 +92,20 @@ const Minimap = (() => {
   }
 
   function update() {
+    if (!visible) return;
     render();
+  }
+
+  function setVisible(next) {
+    visible = !!next;
+    if (canvas) {
+      canvas.style.display = visible ? "block" : "none";
+    }
   }
 
   return {
     init,
     update,
+    setVisible,
   };
 })();

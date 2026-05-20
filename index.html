@@ -18,6 +18,18 @@
       <div class="hud-line bottom">BLACKSTREAM ARCHIVE // tape 03 // do not stray</div>
     </div>
 
+    <div id="esc-menu" aria-hidden="true">
+      <h2>System Menu</h2>
+      <label><input id="opt-textures" type="checkbox" checked /> 贴图</label>
+      <label><input id="opt-vhs" type="checkbox" checked /> VHS 滤镜</label>
+      <label><input id="opt-coord" type="checkbox" checked /> 坐标显示</label>
+      <label><input id="opt-minimap" type="checkbox" checked /> 小地图</label>
+      <label><input id="opt-no-fog" type="checkbox" /> 关闭渐黑效果</label>
+      <label for="opt-fov">视野 FOV: <span id="opt-fov-value">60°</span></label>
+      <input id="opt-fov" type="range" min="40" max="100" value="60" step="1" />
+      <div class="esc-help">按 ESC 关闭菜单并继续</div>
+    </div>
+
     <div id="boot">
       <pre>
   BLACKSTREAM RECOVERY UNIT v0.3

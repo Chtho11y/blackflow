@@ -114,6 +114,49 @@ html, body {
   box-shadow: 0 0 10px rgba(46, 230, 107, 0.25), 0 0 8px rgba(0, 0, 0, 0.45);
 }
 
+#esc-menu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(88vw, 360px);
+  padding: 16px 18px;
+  background: rgba(3, 14, 8, 0.92);
+  border: 1px solid rgba(46, 230, 107, 0.65);
+  box-shadow: 0 0 18px rgba(46, 230, 107, 0.22), inset 0 0 18px rgba(0, 0, 0, 0.65);
+  z-index: 12;
+  display: none;
+  color: #ceffd9;
+  text-shadow: 0 0 3px rgba(88, 255, 142, 0.45);
+  pointer-events: auto;
+}
+#esc-menu.open { display: block; }
+#esc-menu h2 {
+  font-size: 16px;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  color: #8affab;
+}
+#esc-menu label {
+  display: block;
+  margin: 8px 0;
+  font-size: 14px;
+}
+#esc-menu input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: #50ef82;
+}
+#esc-menu input[type="range"] {
+  width: 100%;
+  margin-top: 2px;
+  accent-color: #50ef82;
+}
+#esc-menu .esc-help {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 /* Boot screen (hidden once the player presses anything). */
 #boot {
   position: absolute;

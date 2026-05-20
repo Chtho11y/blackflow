@@ -7,6 +7,8 @@
    ============================================================ */
 
 const Input = (() => {
+  let enabled = true;
+
   const held = {
     forward: false,
     back: false,
@@ -19,6 +21,8 @@ const Input = (() => {
   }
 
   function onKey(e, down) {
+    if (!enabled) return;
+
     /* Support WASD + arrows. */
     switch (e.code) {
       case "KeyW": case "ArrowUp":    bind(e.code, "forward", down); break;
@@ -43,5 +47,15 @@ const Input = (() => {
     if (held.right)   { Player.rotateRight();  return; }
   }
 
-  return { pump, held };
+  function setEnabled(next) {
+    enabled = !!next;
+    if (!enabled) {
+      held.forward = false;
+      held.back = false;
+      held.left = false;
+      held.right = false;
+    }
+  }
+
+  return { pump, held, setEnabled };
 })();
