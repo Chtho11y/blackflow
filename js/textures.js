@@ -242,9 +242,16 @@ const Textures = (() => {
   const ready = new Promise((resolve) => {
     console.info("[Textures] page protocol:", location.protocol, "href:", location.href);
     const img = new Image();
-    /* Safe to leave unset for same-origin (incl. http://localhost), and harmless
-       for file://. Helps if you ever serve from a different origin. */
-    try { img.crossOrigin = "anonymous"; } catch (_) {}
+    /* IMPORTANT: do NOT set img.crossOrigin here.
+       The image is always served from the same origin as this page
+       (we never load from a CDN). Setting crossOrigin="anonymous"
+       turns the request into a CORS request, and GitHub Pages does
+       NOT emit Access-Control-Allow-Origin headers for static asset
+       files — the canvas would then be marked tainted and the
+       subsequent getImageData() call throws SecurityError, dropping
+       us into the procedural fallback ("[ degraded ]"). Leaving
+       crossOrigin unset keeps the image as a plain same-origin
+       resource which getImageData is happy with. */
     img.onload = () => {
       console.info("[Textures] image loaded:", img.width, "x", img.height);
       try {
@@ -257,11 +264,17 @@ const Textures = (() => {
         tex.blackstream = buildWholeImageTex(img, recolorBlackstream);
         resolve(true);
       } catch (e) {
-        /* Fallback: keep procedural textures. Common cause is
-           getImageData() blocked by CORS when running off file://. */
+        /* Fallback: keep procedural textures. Two known causes:
+            1) file:// blocks getImageData (no real origin)
+            2) crossOrigin="anonymous" set without CORS headers
+               from the server -> tainted canvas -> SecurityError */
+        const isSec = e && (e.name === "SecurityError" ||
+                            String(e).includes("tainted"));
         failReason = (location.protocol === "file:")
           ? "file:// blocks getImageData (start a local HTTP server)"
-          : ("slice error: " + (e && e.message || e));
+          : (isSec
+              ? "tainted canvas (CORS): remove img.crossOrigin or serve with Access-Control-Allow-Origin"
+              : ("slice error: " + (e && e.message || e)));
         console.warn("[Textures] image slice failed, using procedural fallback:", e);
         resolve(false);
       }
