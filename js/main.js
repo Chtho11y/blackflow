@@ -11,6 +11,7 @@
 
   Raycaster.init(sceneCanvas);
   VHS.init(vhsCanvas, sceneCanvas);
+  Minimap.init();
 
   /* Hide boot screen on first input — but only after assets ready. */
   let started = false;
@@ -48,6 +49,7 @@
     Input.pump();
     Player.update(dt);
     Raycaster.render(now);
+    Minimap.update();
     VHS.render(now);
 
     /* Tape-style HUD readout. */
@@ -61,6 +63,7 @@
     if (ps.cx === Maze.exit.x && ps.cy === Maze.exit.y && !loop._reached) {
       loop._reached = true;
       VHS.punch(2200, 1.0);
+      alert("恭喜逃出");
     }
 
     requestAnimationFrame(loop);

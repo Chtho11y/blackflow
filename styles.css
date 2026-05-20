@@ -102,6 +102,18 @@ html, body {
   z-index: 5;
 }
 
+#minimap {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 4;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 1px solid rgba(46, 230, 107, 0.85);
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(46, 230, 107, 0.25), 0 0 8px rgba(0, 0, 0, 0.45);
+}
+
 /* Boot screen (hidden once the player presses anything). */
 #boot {
   position: absolute;
