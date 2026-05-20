@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BLACKSTREAM // forest</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="screen">
+    <!-- Low-res scene canvas, scaled up via CSS for pixel look -->
+    <canvas id="scene" width="320" height="200"></canvas>
+    <!-- Post-processing overlay (VHS) at full screen resolution -->
+    <canvas id="vhs"></canvas>
+
+    <div id="hud">
+      <div class="hud-line"><span class="blink">REC</span> &nbsp; SP-08 &nbsp; <span id="coord">00,00 N</span></div>
+      <div class="hud-line bottom">BLACKSTREAM ARCHIVE // tape 03 // do not stray</div>
+    </div>
+
+    <div id="boot">
+      <pre>
+  BLACKSTREAM RECOVERY UNIT v0.3
+  ------------------------------
+  loading tape...........[ ok ]
+  decoding signal........[ ok ]
+  link to subject........[ ok ]
+
+  > press any key to descend
+      </pre>
+    </div>
+  </div>
+
+  <script src="js/textures.js"></script>
+  <script src="js/maze.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/raycaster.js"></script>
+  <script src="js/vhs.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
