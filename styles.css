@@ -133,3 +133,54 @@ html, body {
   white-space: pre;
 }
 #boot.hidden { display: none; }
+
+/* Dialogue system styles */
+#dialogue-container {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+#dialogue-container.hidden {
+  display: none;
+}
+
+#dialogue-character {
+  width: 70vh;
+  height: 50vh;
+  object-fit: cover;
+  object-position: center top;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 0 25px rgba(155, 214, 168, 0.8));
+}
+
+#dialogue-box {
+  width: 100%;
+  height: 25vh;
+  max-width: none;
+  padding: 20px 40px;
+  background: rgba(5, 8, 7, 0.98);
+  border: 2px solid #2a3a30;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(155, 214, 168, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dialogue-text {
+  font-size: 32px;
+  line-height: 1.8;
+  color: #c8ffd1;
+  text-shadow: 0 0 10px rgba(155, 214, 168, 0.7);
+  margin: 0;
+  text-align: center;
+}

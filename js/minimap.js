@@ -5,8 +5,8 @@
 
 const Minimap = (() => {
   let canvas, ctx;
-  let cellSize = 4;
-  let padding = 4;
+  let cellSize = 12;
+  let padding = 10;
 
   function init() {
     canvas = document.getElementById("minimap");

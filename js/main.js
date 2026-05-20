@@ -12,15 +12,15 @@
   Raycaster.init(sceneCanvas);
   VHS.init(vhsCanvas, sceneCanvas);
   Minimap.init();
+  Dialogue.init();
 
   /* Hide boot screen on first input — but only after assets ready. */
   let started = false;
   let assetsReady = false;
   function start() {
-    if (started || !assetsReady) return;
+    if (started) return;
     started = true;
     bootEl.classList.add("hidden");
-    /* Punch a glitch as a "tape engaged" cue. */
     VHS.punch(500, 1.0);
   }
   window.addEventListener("keydown", start, { once: false });
@@ -28,7 +28,6 @@
 
   Textures.ready.then((ok) => {
     assetsReady = true;
-    /* Tweak the boot prompt to reflect which texture path we ended up on. */
     const pre = bootEl.querySelector("pre");
     if (pre) {
       const reason = Textures.failReason ? ("\n  reason: " + Textures.failReason) : "";
@@ -42,18 +41,32 @@
   });
 
   let last = performance.now();
+  let lastCellKey = "";
+  
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
 
     Input.pump();
     Player.update(dt);
+    
+    const ps = Player.state;
+    const cellKey = `${ps.cx},${ps.cy}`;
+    
+    /* Check for dialogue events when player enters a new cell */
+    if (!Dialogue.isActive()) {
+      if (cellKey !== lastCellKey && Dialogue.isDialogueCell(ps.cx, ps.cy)) {
+        Dialogue.show(ps.cx, ps.cy);
+      }
+    }
+    
+    lastCellKey = cellKey;
+    
     Minimap.update();
     Raycaster.render(now);
     VHS.render(now);
 
     /* Tape-style HUD readout. */
-    const ps = Player.state;
     coordEl.textContent =
       `${String(ps.cx).padStart(2, "0")},${String(ps.cy).padStart(2, "0")} ` +
       Player.DIRS[ps.dir].label;
