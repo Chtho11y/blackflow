@@ -20,7 +20,8 @@ const Player = (() => {
     /* Logical (integer) tile coords. */
     cx: Maze.spawn.x,
     cy: Maze.spawn.y,
-    dir: 1,                    // facing East at start
+    /* Initial heading comes from the layout file (defaults to East). */
+    dir: (Maze.startDir != null ? Maze.startDir : 1),
 
     /* Render-space coords used by raycaster (centre of tile + 0.5). */
     x: Maze.spawn.x + 0.5,

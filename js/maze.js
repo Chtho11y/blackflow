@@ -18,25 +18,157 @@
    ============================================================ */
 
 const Maze = (() => {
-  /* Side bit flags. Order matches Player.DIRS (0=N,1=E,2=S,3=W). */
+  /* Side bit flags. Order matches Player.DIRS (0=N,1=E,2=S,3=W).
+     These are the *internal* bit values. */
   const N = 1, E = 2, S = 4, W = 8;
   const SIDES = [N, E, S, W];
   const OPP   = [S, W, N, E];
 
-  /* --- 1. Generate connectivity on an odd-sized scratch grid. --- */
-  const RW = 21, RH = 21;                      // raw thick-wall grid
-  const raw = Array.from({ length: RH }, () => new Array(RW).fill(1));
-
-  function rawInBounds(x, y) {
-    return x > 0 && y > 0 && x < RW - 1 && y < RH - 1;
-  }
-
-  function carveRaw(seed) {
+  /* A small deterministic PRNG so wall-texture choices stay stable
+     between reloads (we also use it for the DFS fallback). */
+  function makeRand(seed) {
     let s = seed >>> 0;
-    const rand = () => {
+    return () => {
       s = (s * 1103515245 + 12345) >>> 0;
       return s / 0xffffffff;
     };
+  }
+
+  /* Random wall texture id. 1=bark, 2=moss, 3=blackstream (rare). */
+  function makeTexPicker(rand) {
+    return () => {
+      const r = rand();
+      if (r < 0.10) return 3;
+      if (r < 0.35) return 2;
+      return 1;
+    };
+  }
+
+  /* ============================================================
+     Path A — hand-authored layout from window.MAZE_LAYOUT.
+     The file format uses a *different* bitmask convention than our
+     internal one, so we translate per side. We also enforce shared-
+     edge consistency by OR-ing both halves of every shared edge,
+     and force the outer border to be solid wall.
+     ============================================================ */
+  function buildFromLayout(layout) {
+    const rand = makeRand(7);
+    const pickTexId = makeTexPicker(rand);
+
+    const CW = layout.width  | 0;
+    const CH = layout.height | 0;
+    const bits = layout.bits || { N: 1, S: 2, W: 4, E: 8 };
+
+    /* Sanity: matrix dimensions. */
+    if (!Array.isArray(layout.matrix) || layout.matrix.length !== CH) {
+      throw new Error("MAZE_LAYOUT.matrix row count != height");
+    }
+
+    /* Step 1: read every cell's mask, translating external bits to
+       internal (N=1,E=2,S=4,W=8). */
+    const cells = Array.from({ length: CH }, (_, y) =>
+      Array.from({ length: CW }, (_, x) => {
+        const row = layout.matrix[y];
+        if (!row || row.length !== CW) {
+          throw new Error(`MAZE_LAYOUT.matrix row ${y} has wrong length`);
+        }
+        const ext = row[x] | 0;
+        let walls = 0;
+        if (ext & bits.N) walls |= N;
+        if (ext & bits.E) walls |= E;
+        if (ext & bits.S) walls |= S;
+        if (ext & bits.W) walls |= W;
+        return { walls, tex: { N: 0, E: 0, S: 0, W: 0 } };
+      })
+    );
+
+    /* Step 2: reconcile shared edges by OR (any side claiming a wall
+       wins, per user's rule). Also force outer border. */
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CW; x++) {
+        const c = cells[y][x];
+
+        /* North neighbor */
+        if (y > 0) {
+          const up = cells[y - 1][x];
+          if ((c.walls & N) || (up.walls & S)) {
+            c.walls  |= N;
+            up.walls |= S;
+          }
+        } else {
+          c.walls |= N; // outer border
+        }
+
+        /* West neighbor */
+        if (x > 0) {
+          const lf = cells[y][x - 1];
+          if ((c.walls & W) || (lf.walls & E)) {
+            c.walls  |= W;
+            lf.walls |= E;
+          }
+        } else {
+          c.walls |= W;
+        }
+
+        /* South / East borders (interior pairs already covered above
+           when their neighbor is iterated). */
+        if (y === CH - 1) c.walls |= S;
+        if (x === CW - 1) c.walls |= E;
+      }
+    }
+
+    /* Step 3: assign textures, keeping shared edges consistent. */
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CW; x++) {
+        const c = cells[y][x];
+        if (c.walls & N) {
+          if (y > 0 && cells[y - 1][x].tex.S) c.tex.N = cells[y - 1][x].tex.S;
+          else {
+            c.tex.N = pickTexId();
+            if (y > 0) cells[y - 1][x].tex.S = c.tex.N;
+          }
+        }
+        if (c.walls & W) {
+          if (x > 0 && cells[y][x - 1].tex.E) c.tex.W = cells[y][x - 1].tex.E;
+          else {
+            c.tex.W = pickTexId();
+            if (x > 0) cells[y][x - 1].tex.E = c.tex.W;
+          }
+        }
+        if (c.walls & S) {
+          if (y < CH - 1 && cells[y + 1][x].tex.N) c.tex.S = cells[y + 1][x].tex.N;
+          else if (!c.tex.S) c.tex.S = pickTexId();
+        }
+        if (c.walls & E) {
+          if (x < CW - 1 && cells[y][x + 1].tex.W) c.tex.E = cells[y][x + 1].tex.W;
+          else if (!c.tex.E) c.tex.E = pickTexId();
+        }
+      }
+    }
+
+    /* spawn / exit. The file uses [row, col] = [y, x]. */
+    const [sy, sx] = layout.start;
+    const [ey, ex] = layout.end;
+    const spawn = { x: sx | 0, y: sy | 0 };
+    const exit  = { x: ex | 0, y: ey | 0 };
+    const startDir = (layout.startDir | 0) & 3;
+
+    return { cells, CW, CH, spawn, exit, startDir };
+  }
+
+  /* ============================================================
+     Path B — DFS fallback (the original generator). Used only if
+     no MAZE_LAYOUT is present on window.
+     ============================================================ */
+  function buildFromDFS(seed) {
+    const RW = 21, RH = 21;
+    const raw = Array.from({ length: RH }, () => new Array(RW).fill(1));
+    const rand = makeRand(seed);
+    const pickTexId = makeTexPicker(rand);
+
+    function rawInBounds(x, y) {
+      return x > 0 && y > 0 && x < RW - 1 && y < RH - 1;
+    }
     const shuffle = (arr) => {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = (rand() * (i + 1)) | 0;
@@ -49,7 +181,6 @@ const Maze = (() => {
     raw[start[1]][start[0]] = 0;
     const stack = [start];
     const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
-
     while (stack.length) {
       const [cx, cy] = stack[stack.length - 1];
       const cands = shuffle(dirs.slice()).filter(([dx, dy]) => {
@@ -62,66 +193,63 @@ const Maze = (() => {
       raw[cy + dy][cx + dx] = 0;
       stack.push([cx + dx, cy + dy]);
     }
-    return rand;
-  }
 
-  const rand = carveRaw(7);
+    const CW = ((RW - 1) / 2) | 0;
+    const CH = ((RH - 1) / 2) | 0;
+    function rawWall(rx, ry) {
+      if (rx < 0 || ry < 0 || rx >= RW || ry >= RH) return 1;
+      return raw[ry][rx] !== 0;
+    }
 
-  /* --- 2. Fold raw grid into thin-wall cells.
-     A "room" sits at raw position (2*cx + 1, 2*cy + 1).
-     A wall between two rooms exists iff the edge cell between
-     them in `raw` is non-zero. --- */
-  const CW = ((RW - 1) / 2) | 0;               // 10
-  const CH = ((RH - 1) / 2) | 0;               // 10
-
-  function rawWall(rx, ry) {
-    if (rx < 0 || ry < 0 || rx >= RW || ry >= RH) return 1;
-    return raw[ry][rx] !== 0;
-  }
-
-  /* Random wall texture id with the same weights as before. */
-  function pickTexId() {
-    const r = rand();
-    if (r < 0.10) return 3;       // blackstream — rare
-    if (r < 0.35) return 2;       // moss
-    return 1;                     // bark
-  }
-
-  const cells = Array.from({ length: CH }, (_, cy) =>
-    Array.from({ length: CW }, (_, cx) => {
-      const rx = cx * 2 + 1;
-      const ry = cy * 2 + 1;
-      let walls = 0;
-      const tex = { N: 0, E: 0, S: 0, W: 0 };
-
-      if (rawWall(rx,     ry - 1)) { walls |= N; tex.N = pickTexId(); }
-      if (rawWall(rx + 1, ry    )) { walls |= E; tex.E = pickTexId(); }
-      if (rawWall(rx,     ry + 1)) { walls |= S; tex.S = pickTexId(); }
-      if (rawWall(rx - 1, ry    )) { walls |= W; tex.W = pickTexId(); }
-
-      return { walls, tex };
-    })
-  );
-
-  /* Make sure shared edges agree on texture id (N of (x,y) == S of (x,y-1)). */
-  for (let y = 0; y < CH; y++) {
-    for (let x = 0; x < CW; x++) {
-      const c = cells[y][x];
-      if ((c.walls & N) && y > 0) {
-        const up = cells[y - 1][x];
-        if (up.tex.S) c.tex.N = up.tex.S;
-        else          up.tex.S = c.tex.N;
-      }
-      if ((c.walls & W) && x > 0) {
-        const lf = cells[y][x - 1];
-        if (lf.tex.E) c.tex.W = lf.tex.E;
-        else          lf.tex.E = c.tex.W;
+    const cells = Array.from({ length: CH }, (_, cy) =>
+      Array.from({ length: CW }, (_, cx) => {
+        const rx = cx * 2 + 1;
+        const ry = cy * 2 + 1;
+        let walls = 0;
+        const tex = { N: 0, E: 0, S: 0, W: 0 };
+        if (rawWall(rx,     ry - 1)) { walls |= N; tex.N = pickTexId(); }
+        if (rawWall(rx + 1, ry    )) { walls |= E; tex.E = pickTexId(); }
+        if (rawWall(rx,     ry + 1)) { walls |= S; tex.S = pickTexId(); }
+        if (rawWall(rx - 1, ry    )) { walls |= W; tex.W = pickTexId(); }
+        return { walls, tex };
+      })
+    );
+    /* Reconcile shared-edge texture choice. */
+    for (let y = 0; y < CH; y++) {
+      for (let x = 0; x < CW; x++) {
+        const c = cells[y][x];
+        if ((c.walls & N) && y > 0) {
+          const up = cells[y - 1][x];
+          if (up.tex.S) c.tex.N = up.tex.S;
+          else          up.tex.S = c.tex.N;
+        }
+        if ((c.walls & W) && x > 0) {
+          const lf = cells[y][x - 1];
+          if (lf.tex.E) c.tex.W = lf.tex.E;
+          else          lf.tex.E = c.tex.W;
+        }
       }
     }
+
+    return {
+      cells, CW, CH,
+      spawn: { x: 0, y: 0 },
+      exit:  { x: CW - 1, y: CH - 1 },
+      startDir: 1,
+    };
   }
 
-  const spawn = { x: 0,      y: 0      };
-  const exit  = { x: CW - 1, y: CH - 1 };
+  /* --- Choose path A or B and unpack. --- */
+  const built = (typeof window !== "undefined" && window.MAZE_LAYOUT)
+    ? buildFromLayout(window.MAZE_LAYOUT)
+    : buildFromDFS(7);
+
+  const cells     = built.cells;
+  const CW        = built.CW;
+  const CH        = built.CH;
+  const spawn     = built.spawn;
+  const exit      = built.exit;
+  const startDir  = built.startDir;
 
   function inBounds(cx, cy) {
     return cx >= 0 && cy >= 0 && cx < CW && cy < CH;
@@ -151,15 +279,14 @@ const Maze = (() => {
     cells,
     W: CW,
     H: CH,
-    /* expose the same `width` / `height` names some old code may use */
     width: CW,
     height: CH,
     spawn,
     exit,
+    startDir,
     hasWall,
     wallTexAt,
     isWall,
-    /* side flag constants for any external consumer */
     SIDE: { N: 0, E: 1, S: 2, W: 3 },
   };
 })();

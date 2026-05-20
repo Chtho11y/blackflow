@@ -136,21 +136,25 @@ const Raycaster = (() => {
 
       for (let x = 0; x < W; x++) {
         /* Wrap to texture. The blackstream tile is 64x64 power-of-two,
-           so `& (size-1)` is the cheap modulo. We sample at 1 cell per
-           texture-tile by default — tweak the multiplier if you want
-           the ground "grain" larger or smaller. */
-        const TILE = 1.0; // world-units per texture repeat
+           so `& (size-1)` is the cheap modulo. TILE controls how many
+           world units one texture repeat covers — larger = bigger,
+           more visible patches of "stream" under your feet. */
+        const TILE = 2.0; // world-units per texture repeat
         const u = floorX / TILE;
         const v = floorY / TILE;
         const tx = (((u - Math.floor(u)) * gW) | 0) & (gW - 1);
         const ty = (((v - Math.floor(v)) * gH) | 0) & (gH - 1);
         const idx = (ty * gW + tx) * 4;
-        /* Floor is darker than the source tile so it never out-shines
-           the (also dark) walls. */
-        const FLOOR_GAIN = 0.55;
-        const r0 = gData[idx]     * FLOOR_GAIN;
-        const g0 = gData[idx + 1] * FLOOR_GAIN;
-        const b0 = gData[idx + 2] * FLOOR_GAIN;
+        /* Source blackstream texture is intentionally near-black, so
+           we *boost* it here — otherwise fog crushes the floor into
+           solid pitch and you can't read the ground at all. Combined
+           with the fog blend below, the floor still goes pure-black
+           past ~2 tiles, just like the walls. */
+        const FLOOR_GAIN = 1.6;
+        const FLOOR_BIAS = 6;     // lifted black point so detail survives
+        const r0 = Math.min(255, gData[idx]     * FLOOR_GAIN + FLOOR_BIAS);
+        const g0 = Math.min(255, gData[idx + 1] * FLOOR_GAIN + FLOOR_BIAS);
+        const b0 = Math.min(255, gData[idx + 2] * FLOOR_GAIN + FLOOR_BIAS);
 
         /* Fade to ambient floor (near-pitch with faint dead-green). */
         const r = (r0 * nf + 2 * f) | 0;
