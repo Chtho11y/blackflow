@@ -75,7 +75,7 @@ const Raycaster = (() => {
     const ps = Player.state;
     const baseAngle = ps.angle;
     /* Subtle vertical bob shifts the horizon a couple pixels. */
-    const horizon = (H * 0.5) + ps.bob;
+    const horizon = (H * 1.8) + ps.bob;
 
     /* --- 1. Sky (canopy): pitch black with a per-pixel ±2 noise so it
        doesn't read as a flat dead colour under the VHS post-pass. --- */

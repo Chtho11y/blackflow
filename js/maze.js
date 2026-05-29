@@ -239,17 +239,100 @@ const Maze = (() => {
     };
   }
 
-  /* --- Choose path A or B and unpack. --- */
-  const built = (typeof window !== "undefined" && window.MAZE_LAYOUT)
+  /* ============================================================
+     Multi-zone system: 5 interconnected zones forming a loop
+     ============================================================ */
+  const NUM_ZONES = 5;
+  const zones = [];
+  
+  /* Build the base layout once and clone for each zone */
+  const baseLayout = (typeof window !== "undefined" && window.MAZE_LAYOUT)
     ? buildFromLayout(window.MAZE_LAYOUT)
     : buildFromDFS(7);
 
-  const cells     = built.cells;
-  const CW        = built.CW;
-  const CH        = built.CH;
-  const spawn     = built.spawn;
-  const exit      = built.exit;
-  const startDir  = built.startDir;
+  /* Item definitions - placed at specific coordinates per zone */
+  const zoneItems = [
+    { zone: 1, x: baseLayout.exit.x, y: baseLayout.exit.y, itemId: "axe" },
+  ];
+
+  /* Create 5 zones with identical layout */
+  for (let z = 0; z < NUM_ZONES; z++) {
+    /* Deep clone the cells */
+    const clonedCells = baseLayout.cells.map(row => 
+      row.map(cell => ({ 
+        walls: cell.walls, 
+        tex: { ...cell.tex } 
+      }))
+    );
+    
+    zones.push({
+      cells: clonedCells,
+      CW: baseLayout.CW,
+      CH: baseLayout.CH,
+      spawn: { ...baseLayout.spawn },
+      exit: { ...baseLayout.exit },
+      startDir: baseLayout.startDir,
+      zoneId: z + 1
+    });
+  }
+
+  /* Collect items that exist in current zone */
+  function getZoneItems(zoneId) {
+    return zoneItems.filter(z => z.zone === zoneId);
+  }
+
+  /* Check if a cell has an item and return it */
+  function getItemAt(cx, cy, zoneId) {
+    const item = zoneItems.find(z => z.zone === zoneId && z.x === cx && z.y === cy);
+    return item ? item.itemId : null;
+  }
+
+  /* Mark item as collected (remove from zone) */
+  const collectedItems = new Set();
+  function collectItem(cx, cy, zoneId) {
+    const key = `${zoneId},${cx},${cy}`;
+    if (collectedItems.has(key)) return null;
+    const itemId = getItemAt(cx, cy, zoneId);
+    if (itemId) {
+      collectedItems.add(key);
+      return itemId;
+    }
+    return null;
+  }
+
+  /* Current zone state */
+  let currentZoneIndex = 0;
+  
+  function getCurrentZone() {
+    return zones[currentZoneIndex];
+  }
+
+  function getCurrentZoneId() {
+    return currentZoneIndex + 1;
+  }
+
+  function getTotalZones() {
+    return NUM_ZONES;
+  }
+
+  /* Advance to next zone (wraps around from 5 to 1) */
+  function advanceZone() {
+    currentZoneIndex = (currentZoneIndex + 1) % NUM_ZONES;
+    return getCurrentZoneId();
+  }
+
+  /* Reset to zone 1 */
+  function resetToZone1() {
+    currentZoneIndex = 0;
+  }
+
+  /* --- Current zone properties --- */
+  const cells     = getCurrentZone().cells;
+  const CW        = getCurrentZone().CW;
+  const CH        = getCurrentZone().CH;
+  const spawn     = getCurrentZone().spawn;
+  const exit      = getCurrentZone().exit;
+  const startDir  = getCurrentZone().startDir;
 
   function inBounds(cx, cy) {
     return cx >= 0 && cy >= 0 && cx < CW && cy < CH;
@@ -258,12 +341,12 @@ const Maze = (() => {
   /* side = 0..3 (N,E,S,W). True if that edge is a wall (or out of map). */
   function hasWall(cx, cy, side) {
     if (!inBounds(cx, cy)) return true;
-    return (cells[cy][cx].walls & SIDES[side]) !== 0;
+    return (getCurrentZone().cells[cy][cx].walls & SIDES[side]) !== 0;
   }
 
   function wallTexAt(cx, cy, side) {
     if (!inBounds(cx, cy)) return 1;
-    const t = cells[cy][cx].tex;
+    const t = getCurrentZone().cells[cy][cx].tex;
     return [t.N, t.E, t.S, t.W][side] || 1;
   }
 
@@ -288,5 +371,14 @@ const Maze = (() => {
     wallTexAt,
     isWall,
     SIDE: { N: 0, E: 1, S: 2, W: 3 },
+    /* Multi-zone API */
+    getCurrentZoneId,
+    getTotalZones,
+    advanceZone,
+    resetToZone1,
+    zones,
+    /* Item API */
+    getItemAt,
+    collectItem
   };
 })();
