@@ -12,7 +12,7 @@ const Raycaster = (() => {
   let fov = DEFAULT_FOV;
   const MAX_DEPTH = 6;                 // rays don't need to go far when fog kills them fast
   const FOG_START = 0.4;               // fog begins almost immediately
-  const FOG_END = 2.2;                 // fully black just past 2 tiles
+  const FOG_END = 4.0;                 // fully black just past 2 tiles
   const FOG_CURVE = 1.8;               // >1 = darken faster near the end
   let useTextures = true;
   let fogEnabled = true;
@@ -117,7 +117,7 @@ const Raycaster = (() => {
     /* Camera height in cell units. 0.5 puts us "eye level" but for floor
        casting what matters is the player's distance *above* the floor;
        smaller value = farther floor pushed up (looks more grounded). */
-    const camZ = 0.5 * H;
+    const camZ = 1.0 * H;
 
     for (let y = (horizon | 0); y < H; y++) {
       /* Vertical distance from the horizon, in screen pixels. */

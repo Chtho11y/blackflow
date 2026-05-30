@@ -9,6 +9,7 @@
   const bootEl      = document.getElementById("boot");
   const coordEl     = document.getElementById("coord");
   const menuEl      = document.getElementById("esc-menu");
+  const zoneEl      = document.getElementById("zone");
 
   const optTextures = document.getElementById("opt-textures");
   const optVhs      = document.getElementById("opt-vhs");
@@ -21,6 +22,8 @@
   Raycaster.init(sceneCanvas);
   VHS.init(vhsCanvas, sceneCanvas);
   Minimap.init();
+  Dialogue.init();
+  Inventory.init();
 
   const settings = {
     textures: true,
@@ -100,10 +103,9 @@
   let started = false;
   let assetsReady = false;
   function start() {
-    if (started || !assetsReady) return;
+    if (started) return;
     started = true;
     bootEl.classList.add("hidden");
-    /* Punch a glitch as a "tape engaged" cue. */
     VHS.punch(500, 1.0);
   }
   window.addEventListener("keydown", start, { once: false });
@@ -111,7 +113,6 @@
 
   Textures.ready.then((ok) => {
     assetsReady = true;
-    /* Tweak the boot prompt to reflect which texture path we ended up on. */
     const pre = bootEl.querySelector("pre");
     if (pre) {
       const reason = Textures.failReason ? ("\n  reason: " + Textures.failReason) : "";
@@ -124,29 +125,91 @@
     }
   });
 
+  /* Zone transition */
+  let lastCellKey = "";
+
+  function transitionToNextZone() {
+    const currentZone = Maze.getCurrentZoneId();
+    const nextZone = Maze.advanceZone();
+    
+    /* Reset player position to the new zone's spawn point */
+    const ps = Player.state;
+    ps.cx = Maze.spawn.x;
+    ps.cy = Maze.spawn.y;
+    ps.x = Maze.spawn.x + 0.5;
+    ps.y = Maze.spawn.y + 0.5;
+    ps.dir = Maze.startDir;
+    ps.angle = [-Math.PI / 2, 0, Math.PI / 2, Math.PI][ps.dir];
+    
+    /* Reset movement state */
+    ps.moving = false;
+    ps.rotating = false;
+    lastCellKey = "";
+    
+    VHS.punch(1000, 0.8);
+    
+    /* Check if completed all zones (loop back to zone 1) */
+    if (nextZone === 1 && currentZone === Maze.getTotalZones()) {
+      alert("恭喜你完成了所有区域的循环！");
+    }
+  }
+
   let last = performance.now();
+  
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
 
     if (!menuOpen) Input.pump();
     Player.update(dt);
+    
+    const ps = Player.state;
+    const cellKey = `${ps.cx},${ps.cy}`;
+    
+    /* Check for dialogue events when player enters a new cell */
+    if (!Dialogue.isActive()) {
+      if (cellKey !== lastCellKey && Dialogue.isDialogueCell(ps.cx, ps.cy)) {
+        Dialogue.show(ps.cx, ps.cy);
+      }
+    }
+    
+    /* Check for items when player enters a new cell */
+    if (cellKey !== lastCellKey && !Inventory.isOpen()) {
+      const itemId = Maze.collectItem(ps.cx, ps.cy, Maze.getCurrentZoneId());
+      if (itemId) {
+        Inventory.addItem(itemId);
+        const itemInfo = Inventory.ITEMS[itemId];
+        if (itemInfo) {
+          VHS.punch(300, 0.5);
+        }
+      }
+    }
+    
+    lastCellKey = cellKey;
+    
     Raycaster.render(now);
-    if (settings.minimap) Minimap.update();
+    Minimap.update();
     if (settings.vhs) VHS.render(now);
 
     /* Tape-style HUD readout. */
-    const ps = Player.state;
     coordEl.textContent =
       `${String(ps.cx).padStart(2, "0")},${String(ps.cy).padStart(2, "0")} ` +
       Player.DIRS[ps.dir].label;
 
-    /* Reaching the exit triggers a long glitch (placeholder for
-       end-of-tape sequence). */
+    /* Zone indicator */
+    if (zoneEl) {
+      zoneEl.textContent = `Zone ${Maze.getCurrentZoneId()}/${Maze.getTotalZones()}`;
+    }
+
+    /* Reaching the exit triggers zone transition */
     if (ps.cx === Maze.exit.x && ps.cy === Maze.exit.y && !loop._reached) {
       loop._reached = true;
-      VHS.punch(2200, 1.0);
-      alert("恭喜逃出");
+      transitionToNextZone();
+    }
+    
+    /* Reset reached flag when player moves away from exit */
+    if (ps.cx !== Maze.exit.x || ps.cy !== Maze.exit.y) {
+      loop._reached = false;
     }
 
     requestAnimationFrame(loop);

@@ -57,10 +57,14 @@ const Player = (() => {
     return state.moving || state.rotating;
   }
 
+  function isBlocked() {
+    return isBusy() || (typeof Dialogue !== 'undefined' && !Dialogue.canMove());
+  }
+
   /* Try to step forward one cell. Rejected if there's a wall on the
      current cell's facing edge, or the target cell is out of bounds. */
   function stepForward() {
-    if (isBusy()) return false;
+    if (isBlocked()) return false;
     const d = DIRS[state.dir];
     if (Maze.hasWall(state.cx, state.cy, state.dir)) return false;
     const tx = state.cx + d.x;
@@ -78,7 +82,7 @@ const Player = (() => {
 
   /* Step backward (without turning) — check the back-facing edge. */
   function stepBackward() {
-    if (isBusy()) return false;
+    if (isBlocked()) return false;
     const d = DIRS[state.dir];
     const backDir = (state.dir + 2) % 4;
     if (Maze.hasWall(state.cx, state.cy, backDir)) return false;
@@ -97,7 +101,7 @@ const Player = (() => {
 
   /* Rotate 90 degrees. delta = -1 (left) or +1 (right). */
   function rotate(delta) {
-    if (isBusy()) return false;
+    if (isBlocked()) return false;
     const newDir = (state.dir + delta + 4) % 4;
     state.tweenFromA = state.angle;
     /* Keep angle continuous (no flips through 2pi). */
