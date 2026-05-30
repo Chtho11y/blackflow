@@ -1,10 +1,10 @@
 /* ============================================================
    inventory.js
-   Inventory system with backpack UI. Press B to toggle.
+   Inventory system with sidebar UI. Always visible on screen.
    ============================================================ */
 
 const Inventory = (() => {
-  let container, itemList, _isOpen = false;
+  let container, itemList;
   const items = [];
 
   const ITEMS = {
@@ -31,7 +31,6 @@ const Inventory = (() => {
   function init() {
     container = document.createElement("div");
     container.id = "inventory-container";
-    container.classList.add("hidden");
     document.getElementById("screen").appendChild(container);
 
     const header = document.createElement("div");
@@ -43,38 +42,11 @@ const Inventory = (() => {
     itemList.className = "inventory-items";
     container.appendChild(itemList);
 
-    window.addEventListener("keydown", (e) => {
-      if (e.key.toLowerCase() === "b") {
-        toggle();
-      }
-    });
-
-    container.addEventListener("click", () => {
-      close();
-    });
-  }
-
-  function toggle() {
-    if (_isOpen) {
-      close();
-    } else {
-      open();
-    }
-  }
-
-  function open() {
-    _isOpen = true;
-    container.classList.remove("hidden");
     renderItems();
   }
 
-  function close() {
-    _isOpen = false;
-    container.classList.add("hidden");
-  }
-
   function isOpen() {
-    return _isOpen;
+    return true;
   }
 
   function addItem(itemId) {
@@ -88,6 +60,7 @@ const Inventory = (() => {
         quantity: 1
       });
     }
+    renderItems();
     return true;
   }
 
@@ -120,9 +93,6 @@ const Inventory = (() => {
 
   return {
     init,
-    toggle,
-    open,
-    close,
     isOpen,
     addItem,
     hasItem,

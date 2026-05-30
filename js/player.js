@@ -62,10 +62,28 @@ const Player = (() => {
   }
 
   /* Try to step forward one cell. Rejected if there's a wall on the
-     current cell's facing edge, or the target cell is out of bounds. */
+     current cell's facing edge, or the target cell is out of bounds.
+     If a teleport is defined at this position/direction, use it instead. */
   function stepForward() {
     if (isBlocked()) return false;
     const d = DIRS[state.dir];
+
+    /* Check for teleport first - teleports bypass walls */
+    const tp = Maze.getTeleport(Maze.getCurrentZoneId(), state.cx, state.cy, state.dir, Inventory.hasItem);
+    if (tp) {
+      const dest = Maze.executeTeleport(tp);
+      state.moving = false;
+      state.rotating = false;
+      state.cx = dest.cx;
+      state.cy = dest.cy;
+      state.x = dest.x;
+      state.y = dest.y;
+      state.dir = dest.dir;
+      state.angle = angleOf(dest.dir);
+      VHS.punch(300, 0.5);
+      return true;
+    }
+
     if (Maze.hasWall(state.cx, state.cy, state.dir)) return false;
     const tx = state.cx + d.x;
     const ty = state.cy + d.y;
@@ -115,6 +133,20 @@ const Player = (() => {
     return true;
   }
 
+  function teleport(zoneId) {
+    const dest = Maze.teleportToZone(zoneId);
+    state.moving = false;
+    state.rotating = false;
+    state.cx = dest.x;
+    state.cy = dest.y;
+    state.x = dest.x + 0.5;
+    state.y = dest.y + 0.5;
+    state.dir = dest.dir;
+    state.angle = angleOf(dest.dir);
+    state.bob = 0;
+    VHS.punch(300, 0.5);
+  }
+
   function update(dt) {
     if (state.moving) {
       state.tweenT += dt / state.tweenDur;
@@ -147,6 +179,7 @@ const Player = (() => {
     stepBackward,
     rotateLeft:  () => rotate(-1),
     rotateRight: () => rotate( 1),
+    teleport,
     update,
   };
 })();

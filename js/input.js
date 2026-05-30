@@ -25,9 +25,20 @@ const Input = (() => {
       case "KeyS": case "ArrowDown":  bind(e.code, "back",    down); break;
       case "KeyA": case "ArrowLeft":  bind(e.code, "left",    down); break;
       case "KeyD": case "ArrowRight": bind(e.code, "right",   down); break;
-      default: return;
+      default: break;
     }
-    e.preventDefault();
+    /* Number keys 1-5 for zone teleport */
+    if (down) {
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= 5) {
+        Player.teleport(num);
+        e.preventDefault();
+        return;
+      }
+    }
+    if (["KeyW","KeyS","KeyA","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) {
+      e.preventDefault();
+    }
   }
 
   window.addEventListener("keydown", (e) => onKey(e, true));

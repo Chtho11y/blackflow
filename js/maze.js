@@ -252,8 +252,53 @@ const Maze = (() => {
 
   /* Item definitions - placed at specific coordinates per zone */
   const zoneItems = [
-    { zone: 1, x: baseLayout.exit.x, y: baseLayout.exit.y, itemId: "axe" },
+    { zone: 1, x: 0, y: 4, itemId: "axe" },
   ];
+
+  /* ============================================================
+     TELEPORT DEFINITIONS (TESTING ONLY)
+     ============================================================
+     When player tries to move in fromDir direction at (fromX, fromY)
+     in fromZone, they are teleported to (toX, toY) in toZone facing toDir.
+
+     Directions: 0=N, 1=E, 2=S, 3=W
+
+     Teleport entry fields:
+       - fromZone, fromX, fromY: Origin position
+       - fromDir: Direction player must be facing (0=N, 1=E, 2=S, 3=W)
+       - toZone, toX, toY: Destination position
+       - toDir: Direction player faces after teleport
+       - requiredItem: Item ID required to activate (null = no item required)
+     ============================================================ */
+  const teleports = [
+    /* TEST: Zone 1 (2,5) East → Zone 2 (1,1) North (requires 'axe') */
+    { fromZone: 1, fromX: 2, fromY: 5, fromDir: 1, toZone: 2, toX: 1, toY: 1, toDir: 0, requiredItem: "axe" },
+  ];
+
+  /* Find teleport at (zone, x, y, dir). Returns null if none.
+     If hasItemFn is provided, also checks requiredItem. */
+  function getTeleport(zone, x, y, dir, hasItemFn) {
+    const tp = teleports.find(t =>
+      t.fromZone === zone && t.fromX === x && t.fromY === y && t.fromDir === dir
+    );
+    if (!tp) return null;
+    if (tp.requiredItem && hasItemFn && !hasItemFn(tp.requiredItem)) return null;
+    return tp;
+  }
+
+  /* Execute teleport: returns { cx, cy, x, y, dir, zoneId } or null */
+  function executeTeleport(teleport) {
+    currentZoneIndex = teleport.toZone - 1;
+    const targetZone = zones[teleport.toZone - 1];
+    return {
+      cx: teleport.toX,
+      cy: teleport.toY,
+      x: teleport.toX + 0.5,
+      y: teleport.toY + 0.5,
+      dir: teleport.toDir,
+      zoneId: teleport.toZone
+    };
+  }
 
   /* Create 5 zones with identical layout */
   for (let z = 0; z < NUM_ZONES; z++) {
@@ -326,6 +371,19 @@ const Maze = (() => {
     currentZoneIndex = 0;
   }
 
+  /* Teleport to a specific zone (1-5). Returns spawn info. */
+  function teleportToZone(zoneId) {
+    const z = ((zoneId - 1) % NUM_ZONES + NUM_ZONES) % NUM_ZONES;
+    currentZoneIndex = z;
+    const zone = getCurrentZone();
+    return {
+      x: zone.spawn.x,
+      y: zone.spawn.y,
+      dir: zone.startDir,
+      zoneId: getCurrentZoneId()
+    };
+  }
+
   /* --- Current zone properties --- */
   const cells     = getCurrentZone().cells;
   const CW        = getCurrentZone().CW;
@@ -376,9 +434,14 @@ const Maze = (() => {
     getTotalZones,
     advanceZone,
     resetToZone1,
+    teleportToZone,
     zones,
     /* Item API */
     getItemAt,
-    collectItem
+    collectItem,
+    /* Teleport API */
+    getTeleport,
+    executeTeleport,
+    teleports
   };
 })();

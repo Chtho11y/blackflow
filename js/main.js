@@ -89,7 +89,7 @@
     }
     
     /* Check for items when player enters a new cell */
-    if (cellKey !== lastCellKey && !Inventory.isOpen()) {
+    if (cellKey !== lastCellKey) {
       const itemId = Maze.collectItem(ps.cx, ps.cy, Maze.getCurrentZoneId());
       if (itemId) {
         Inventory.addItem(itemId);
